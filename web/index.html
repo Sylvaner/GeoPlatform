@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Carte de suivi et de téléchargement des données géographiques"
+    />
+    <title>Geo Data — Carte des données</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="/assets/app.css" />
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+      defer
+    ></script>
+    <script type="module" src="/assets/export-preview-3d.js"></script>
+    <script type="module" src="/assets/stl-viewer.js"></script>
+    <script src="/assets/export-wizard.js" defer></script>
+    <script src="/assets/app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Geo Data, revenir à la carte">
+        <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+          <path d="M7 26c5-2 7-11 13-11s8 9 13 7" />
+          <path d="M7 31c6-2 8-10 13-10s8 7 13 5" />
+          <circle cx="20" cy="10" r="3" />
+        </svg>
+        <span class="brand-copy">
+          <strong>Geo Data</strong>
+          <small>Territoire &amp; données</small>
+        </span>
+      </a>
+
+      <nav class="main-nav" aria-label="Navigation principale">
+        <button class="nav-item is-active" type="button" data-navigation="map">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="m2.5 4.5 4.5-2 6 2 4.5-2v13L13 17.5l-6-2-4.5 2zM7 2.5v13M13 4.5v13" />
+          </svg>
+          Carte
+        </button>
+        <button class="nav-item" type="button" data-navigation="activity">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M3 10a7 7 0 1 0 2-5M3 3v5h5M10 6v4l3 2" />
+          </svg>
+          Activité
+          <span class="nav-badge" id="activity-badge" hidden>0</span>
+        </button>
+        <button class="nav-item" type="button" data-navigation="exports">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M3 14.5V17h14v-2.5M10 3v10M6 9l4 4 4-4" />
+          </svg>
+          Exports
+        </button>
+      </nav>
+
+      <div class="topbar-actions">
+        <div class="connection-status" id="connection-status" role="status">
+          <span class="status-dot"></span>
+          <span class="connection-label">Connexion…</span>
+        </div>
+        <button class="secondary-button topbar-export-button" id="export-show-wizard" type="button">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M10 3v14M3 10h14" />
+          </svg>
+          <span>Nouvel export</span>
+        </button>
+        <button class="primary-button" id="open-download" type="button">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M10 3v10M6 9l4 4 4-4M3 16h14" />
+          </svg>
+          <span>Nouvelle zone</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="map-shell">
+      <div
+        id="map"
+        class="map"
+        role="application"
+        aria-label="Carte de France et zones de données disponibles"
+      ></div>
+
+      <div class="selection-guide" id="selection-guide" role="status" aria-live="polite" hidden>
+        <span class="selection-guide-target" aria-hidden="true"></span>
+        <div>
+          <strong>Choisissez le centre de la zone</strong>
+          <span>Cliquez précisément à l’endroit à télécharger.</span>
+        </div>
+        <button class="selection-cancel" id="cancel-selection" type="button">Annuler</button>
+      </div>
+
+      <section class="overview-card" aria-labelledby="overview-title">
+        <div class="overview-heading">
+          <div>
+            <p class="eyebrow">Couverture locale</p>
+            <h1 id="overview-title">Données disponibles</h1>
+          </div>
+          <button class="icon-button" id="refresh-data" type="button" aria-label="Actualiser les données">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M16 7a6.5 6.5 0 1 0 .2 5M16 3v4h-4" />
+            </svg>
+          </button>
+        </div>
+        <div class="metric-grid">
+          <div class="metric">
+            <strong id="zones-count">—</strong>
+            <span>zones visibles</span>
+          </div>
+          <div class="metric">
+            <strong id="storage-size">—</strong>
+            <span>sur le disque</span>
+          </div>
+        </div>
+        <div class="overview-divider"></div>
+        <div class="overview-row">
+          <span class="overview-label">Traitements actifs</span>
+          <strong id="active-jobs">—</strong>
+        </div>
+        <p class="overview-note">
+          Seules les emprises sont dessinées pour préserver la fluidité de la carte.
+        </p>
+      </section>
+
+      <div class="map-tools" aria-label="Outils de la carte">
+        <button class="map-tool" id="view-france" type="button" title="Revenir à la France">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M10 2.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15Zm0 0c2 2 3 4.5 3 7.5s-1 5.5-3 7.5c-2-2-3-4.5-3-7.5s1-5.5 3-7.5ZM3 10h14" />
+          </svg>
+          <span>France</span>
+        </button>
+        <button class="map-tool" id="fit-zones" type="button" title="Cadrer les zones disponibles">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M7 3H3v4M13 3h4v4M17 13v4h-4M7 17H3v-4" />
+          </svg>
+          <span>Zones</span>
+        </button>
+      </div>
+
+      <div class="map-legend" aria-label="Légende des zones">
+        <span><i class="legend-swatch is-ready"></i>Complet</span>
+        <span><i class="legend-swatch is-partial"></i>Partiel</span>
+        <span><i class="legend-swatch is-active"></i>En cours</span>
+        <span><i class="legend-swatch is-selection"></i>Sélection</span>
+      </div>
+
+      <section class="empty-state" id="empty-state" hidden>
+        <div class="empty-icon" aria-hidden="true">
+          <svg viewBox="0 0 28 28">
+            <path d="m4 7 6-3 8 3 6-3v17l-6 3-8-3-6 3zM10 4v17M18 7v17" />
+          </svg>
+        </div>
+        <p class="eyebrow">La carte est prête</p>
+        <h2>Aucune zone téléchargée</h2>
+        <p>Choisissez une emprise et les couches à conserver localement.</p>
+        <button class="secondary-button" id="empty-download" type="button">Choisir une première zone</button>
+      </section>
+    </main>
+
+    <div class="panel-backdrop" id="panel-backdrop" hidden></div>
+
+    <aside class="side-panel download-panel" id="download-panel" aria-hidden="true" aria-labelledby="download-title">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Ajouter des données</p>
+          <h2 id="download-title">Télécharger une zone</h2>
+        </div>
+        <button class="icon-button close-panel" type="button" aria-label="Fermer le panneau">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
+        </button>
+      </div>
+
+      <form id="download-form" class="download-form">
+        <section class="form-section">
+          <label class="zone-name-field">
+            <span>Nom de la zone</span>
+            <input id="zone-name" name="zone-name" type="text" maxlength="80" required placeholder="Ex. Puy de Dôme · versant sud" />
+          </label>
+          <div class="section-heading">
+            <span class="step-number">1</span>
+            <div>
+              <h3>Centre sélectionné</h3>
+              <p>Cliquez à nouveau sur la carte pour le déplacer.</p>
+            </div>
+          </div>
+          <div class="coordinate-grid">
+            <label>
+              <span>Latitude</span>
+              <input id="latitude" name="latitude" type="number" min="41" max="52" step="0.000001" required />
+            </label>
+            <label>
+              <span>Longitude</span>
+              <input id="longitude" name="longitude" type="number" min="-6" max="10" step="0.000001" required />
+            </label>
+          </div>
+          <button class="text-button" id="use-map-center" type="button">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <circle cx="10" cy="10" r="3" /><path d="M10 2v3M10 15v3M2 10h3M15 10h3" />
+            </svg>
+            Choisir un autre centre sur la carte
+          </button>
+          <fieldset class="size-fieldset">
+            <legend>Taille du carré</legend>
+            <div class="segmented-control" id="size-options">
+              <label><input type="radio" name="size" value="1000" /><span>1 km</span></label>
+              <label><input type="radio" name="size" value="3000" checked /><span>3 km</span></label>
+              <label><input type="radio" name="size" value="5000" /><span>5 km</span></label>
+              <label><input type="radio" name="size" value="10000" /><span>10 km</span></label>
+              <label><input type="radio" name="size" value="20000" /><span>20 km</span></label>
+            </div>
+          </fieldset>
+        </section>
+
+        <section class="form-section layer-section">
+          <div class="section-heading">
+            <span class="step-number">2</span>
+            <div>
+              <h3>Choisir les couches</h3>
+              <p>Les données déjà en cache ne seront pas recalculées.</p>
+            </div>
+          </div>
+          <label class="select-all-row">
+            <input id="select-all-layers" type="checkbox" checked />
+            <span>Tout sélectionner</span>
+            <small id="selected-layer-count">7 couches</small>
+          </label>
+          <div class="layer-list" id="layers-list" aria-live="polite">
+            <div class="loading-row"><span class="spinner"></span>Chargement des couches…</div>
+          </div>
+        </section>
+
+        <div class="performance-note">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 18 17H2zM10 7v4M10 14h.01" /></svg>
+          <p><strong>Affichage optimisé.</strong> Les objets détaillés restent sur le serveur ; la carte n’affiche que leurs zones de couverture.</p>
+        </div>
+
+        <div class="panel-footer">
+          <button class="secondary-button close-panel" type="button">Annuler</button>
+          <button class="primary-button submit-button" id="submit-download" type="submit">
+            <span class="button-label">Lancer le téléchargement</span>
+            <span class="button-loading" hidden><span class="spinner"></span>Envoi…</span>
+          </button>
+        </div>
+      </form>
+    </aside>
+
+    <aside class="side-panel export-panel" id="export-panel" aria-hidden="true" aria-labelledby="export-title">
+      <div class="panel-header export-panel-header">
+        <div>
+          <p class="eyebrow">Production 3D</p>
+          <h2 id="export-title">Exports</h2>
+        </div>
+        <div class="export-panel-header-actions">
+          <button class="secondary-button compact-button" id="export-show-history" type="button" hidden>Exports récents</button>
+          <button class="icon-button close-panel" type="button" aria-label="Fermer le panneau">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="export-wizard-view" id="export-wizard-view">
+        <div class="wizard-progress" id="export-progress" aria-label="Étapes de l’export">
+        <span class="is-active"><i>1</i>Zone</span>
+        <span><i>2</i>Format</span>
+        <span><i>3</i>Dimensions</span>
+        <span><i>4</i>Rendu 3D</span>
+        <span><i>5</i>Résumé</span>
+        </div>
+
+        <form class="export-form" id="export-form">
+        <section class="wizard-step is-active" data-export-step="1">
+          <div class="wizard-heading">
+            <p class="eyebrow">Étape 1 sur 5</p>
+            <h3>Choisir les données sources</h3>
+            <p>Une zone partielle n’utilisera que les couches réellement disponibles.</p>
+          </div>
+          <div class="preset-section">
+            <div class="inline-heading">
+              <strong>Profils enregistrés</strong>
+              <small>Réutiliser une configuration</small>
+            </div>
+            <div class="preset-list" id="export-presets"></div>
+          </div>
+          <div class="export-source-list" id="export-source-list"></div>
+          <section class="export-area-card" id="export-area-card" hidden>
+            <div class="inline-heading">
+              <strong>Emprise à exporter</strong>
+              <output id="export-area-size-output">1 km × 1 km</output>
+            </div>
+            <p>Réduisez l’export sans retélécharger les données. Le centre reste toujours contenu dans la zone source.</p>
+            <input id="export-area-size" type="range" min="100" max="3000" step="100" value="1000" />
+            <div class="export-area-coordinates">
+              <label>Latitude du centre<input id="export-area-latitude" type="number" step="0.000001" /></label>
+              <label>Longitude du centre<input id="export-area-longitude" type="number" step="0.000001" /></label>
+            </div>
+          </section>
+        </section>
+
+        <section class="wizard-step" data-export-step="2" hidden>
+          <div class="wizard-heading">
+            <p class="eyebrow">Étape 2 sur 5</p>
+            <h3>Choisir le format et les couches</h3>
+            <p>Le même parcours pilote STL, STL par couches et Blender.</p>
+          </div>
+          <div class="format-grid">
+            <label class="format-card">
+              <input type="radio" name="export-format" value="stl" checked />
+              <span><strong>STL</strong><small>Bloc imprimable continu</small></span>
+            </label>
+            <label class="format-card">
+              <input type="radio" name="export-format" value="stl_layers" />
+              <span><strong>STL par couches</strong><small>Strates topographiques</small></span>
+            </label>
+            <label class="format-card">
+              <input type="radio" name="export-format" value="blender" />
+              <span><strong>Blender</strong><small>Scène éditable complète</small></span>
+            </label>
+          </div>
+          <fieldset class="export-layer-fieldset">
+            <legend>Couches incluses</legend>
+            <div class="export-layer-list" id="export-layer-list"></div>
+          </fieldset>
+        </section>
+
+        <section class="wizard-step" data-export-step="3" hidden>
+          <div class="wizard-heading">
+            <p class="eyebrow">Étape 3 sur 5</p>
+            <h3>Dimensionner le modèle</h3>
+            <p>La taille physique et la qualité suffisent : le nombre de points est calculé automatiquement.</p>
+          </div>
+          <div class="model-size-card" id="model-size-card">
+            <div class="inline-heading">
+              <strong>Largeur finale du STL</strong>
+              <output id="model-width-output">150 mm</output>
+            </div>
+            <input id="export-model-width" type="range" min="60" max="300" step="5" value="150" />
+            <div class="size-presets" aria-label="Tailles courantes">
+              <button type="button" data-model-width="80">80 mm</button>
+              <button type="button" data-model-width="120">120 mm</button>
+              <button class="is-active" type="button" data-model-width="150">150 mm</button>
+              <button type="button" data-model-width="200">200 mm</button>
+              <button type="button" data-model-width="300">300 mm</button>
+            </div>
+          </div>
+          <div class="blender-size-note" id="blender-size-note" hidden>
+            Blender conserve les dimensions géographiques. La taille en millimètres ne concerne que l’impression STL.
+          </div>
+          <div class="model-size-card layer-height-setting" hidden>
+            <div class="inline-heading">
+              <strong>Hauteur d’une strate</strong>
+              <output id="layer-height-output">1,0 m</output>
+            </div>
+            <input id="export-layer-height" type="range" min="0.25" max="20" step="0.25" value="1" />
+            <p class="setting-help">Plus la strate est basse, plus le relief est précis et le nombre de niveaux augmente.</p>
+          </div>
+          <div class="dimension-summary">
+            <div><span>Échelle physique</span><strong id="export-scale-summary">1 : 20 000</strong></div>
+            <div><span>Grille terrain</span><strong id="export-grid-summary">301 × 301</strong></div>
+            <div><span>Sommets estimés</span><strong id="export-points-summary">≈ 90 601</strong></div>
+          </div>
+          <div class="model-size-card terrain-grid-setting">
+            <div class="inline-heading">
+              <strong>Pas de la grille du terrain</strong>
+              <output id="terrain-grid-output">50 m</output>
+            </div>
+            <input id="export-terrain-grid" type="range" min="5" max="100" step="5" value="50" />
+            <div class="range-extremes"><span>5 m · très précis</span><span>100 m · très léger</span></div>
+            <p class="setting-help">Le nombre de sommets et la densité LiDAR sont recalculés immédiatement. Ce réglage ne modifie pas la finesse de la forêt.</p>
+          </div>
+          <p class="automatic-detail">Si une zone est trop grande pour la mémoire disponible, le serveur augmente seulement le pas minimal nécessaire et l’indique dans le résumé.</p>
+        </section>
+
+        <section class="wizard-step" data-export-step="4" hidden>
+          <div class="wizard-heading">
+            <p class="eyebrow">Étape 4 sur 5</p>
+            <h3>Ajuster dans l’aperçu 3D</h3>
+            <p>Faites glisser le modèle pour le tourner et utilisez la molette pour zoomer.</p>
+          </div>
+          <p class="render-format-note" id="render-format-note"></p>
+          <div class="render-workbench">
+            <div class="render-preview-3d-shell">
+              <div class="render-preview-3d" id="export-preview-3d"></div>
+              <div class="preview-3d-badge"><span></span>Aperçu synthétique en temps réel</div>
+              <div class="preview-3d-help">Glisser pour tourner · molette pour zoomer</div>
+            </div>
+            <div class="render-controls">
+              <fieldset class="object-toggle-fieldset">
+                <legend>Objets 3D inclus</legend>
+                <div class="object-toggle-grid">
+                  <label><input id="export-include-buildings" type="checkbox" checked /><span>Bâtiments</span></label>
+                  <label><input id="export-include-roads" type="checkbox" checked /><span>Routes</span></label>
+                  <label><input id="export-include-trees" type="checkbox" checked /><span>Arbres</span></label>
+                </div>
+              </fieldset>
+              <label class="range-control">
+                <span><strong>Largeur des routes</strong><output id="road-width-output">1,0 mm</output></span>
+                <input id="export-road-width" type="range" min="0.6" max="3" step="0.1" value="1" />
+              </label>
+              <fieldset class="tree-shape-fieldset">
+                <legend>Forme des arbres</legend>
+                <div class="tree-shape-grid">
+                  <label><input type="radio" name="export-tree-shape" value="deciduous" checked /><span><strong>Feuillu</strong><small>Houppier arrondi</small></span></label>
+                  <label><input type="radio" name="export-tree-shape" value="conifer" /><span><strong>Sapin</strong><small>Cime conique étagée</small></span></label>
+                  <label class="blender-canopy-option"><input type="radio" name="export-tree-shape" value="canopy" /><span><strong>Forêt LiDAR</strong><small>Canopée globale continue</small></span></label>
+                </div>
+                <p>Les arbres isolés restent imprimables sans support. La canopée LiDAR forme un volume forestier continu, en STL comme dans Blender.</p>
+              </fieldset>
+              <fieldset class="forest-quality-fieldset" hidden>
+                <legend>Forêt LiDAR</legend>
+                <div class="tree-shape-grid">
+                  <label><input type="radio" name="export-forest-quality" value="draft" /><span><strong>Rapide</strong><small>Contour simplifié, fichier léger</small></span></label>
+                  <label><input type="radio" name="export-forest-quality" value="standard" checked /><span><strong>Équilibré</strong><small>Bon compromis pour les lisières</small></span></label>
+                  <label><input type="radio" name="export-forest-quality" value="high" /><span><strong>Détaillé</strong><small>Davantage de points sur le contour</small></span></label>
+                </div>
+                <label class="procedural-material-toggle forest-road-cut-toggle">
+                  <input id="export-carve-forest-roads" type="checkbox" />
+                  <span><strong>Ouvrir la forêt au niveau des routes</strong><small>Retire la canopée au-dessus des chaussées pour laisser la route visible.</small></span>
+                </label>
+                <fieldset class="forest-material-fieldset" hidden>
+                  <legend>Aspect de la forêt dans Blender</legend>
+                  <div class="texture-mode-grid">
+                    <label><input type="radio" name="export-forest-material" value="texture" /><span><strong>Orthophoto</strong><small>Photographie aérienne projetée sur la canopée</small></span></label>
+                    <label><input type="radio" name="export-forest-material" value="procedural" checked /><span><strong>Matériau procédural</strong><small>Variations créées avec deux couleurs</small></span></label>
+                  </div>
+                  <div class="forest-ramp-colors">
+                    <label><input id="export-forest-low-color" type="color" value="#061f05" /><span>Couleur sombre</span></label>
+                    <label><input id="export-forest-high-color" type="color" value="#156b0f" /><span>Couleur claire</span></label>
+                  </div>
+                  <label class="procedural-material-toggle">
+                    <input id="export-keep-isolated-trees" type="checkbox" checked />
+                    <span><strong>Conserver les arbres isolés</strong><small>Affiche des arbres individuels hors des massifs forestiers continus.</small></span>
+                  </label>
+                  <p>L’orthophoto nécessite la couche correspondante. Le matériau procédural reste modifiable dans Blender.</p>
+                </fieldset>
+              </fieldset>
+              <fieldset class="texture-mode-fieldset" id="texture-mode-fieldset" hidden>
+                <legend>Orthophoto du terrain et des toits</legend>
+                <div class="texture-mode-grid">
+                  <label><input type="radio" name="export-texture-mode" value="none" /><span><strong>Sans texture</strong><small>Couleurs uniquement</small></span></label>
+                  <label><input type="radio" name="export-texture-mode" value="ground" /><span><strong>Sol</strong><small>Orthophoto sur le terrain</small></span></label>
+                  <label><input type="radio" name="export-texture-mode" value="ground_and_roofs" checked /><span><strong>Sol + toits</strong><small>Plaquage complet disponible</small></span></label>
+                </div>
+              </fieldset>
+              <fieldset class="orthophoto-storage-fieldset" id="orthophoto-storage-fieldset" hidden>
+                <legend>Poids de l’orthophoto Blender</legend>
+                <div class="texture-mode-grid">
+                  <label><input type="radio" name="export-orthophoto-storage" value="atlas" checked /><span><strong>Atlas optimisé</strong><small>Une seule image, recommandé</small></span></label>
+                  <label><input type="radio" name="export-orthophoto-storage" value="native" /><span><strong>Tuiles natives</strong><small>Qualité originale, scène très lourde</small></span></label>
+                </div>
+                <label class="range-control orthophoto-resolution-control">
+                  <span><strong>Définition de l’atlas</strong><output id="orthophoto-resolution-output">2 048 px</output></span>
+                  <input id="export-orthophoto-resolution" type="range" min="512" max="8192" step="512" value="2048" />
+                  <small id="orthophoto-resolution-help">Environ 1 image de 2 048 × 2 048 px.</small>
+                </label>
+              </fieldset>
+              <fieldset class="color-palette-fieldset" id="color-palette-fieldset" hidden>
+                <legend>Couleurs de la scène</legend>
+                <div class="color-palette-grid">
+                  <label><input id="export-ground-color" type="color" value="#789b72" /><span>Sol</span></label>
+                  <label><input id="export-wall-color" type="color" value="#d4cdbb" /><span>Murs</span></label>
+                  <label><input id="export-roof-color" type="color" value="#b89462" /><span>Toits</span></label>
+                  <label><input id="export-tree-color" type="color" value="#3f7856" /><span>Arbres</span></label>
+                  <label><input id="export-road-color" type="color" value="#1b1f1d" /><span>Routes</span></label>
+                  <label><input id="export-water-color" type="color" value="#2f8fbd" /><span>Eau</span></label>
+                </div>
+                <label class="procedural-material-toggle">
+                  <input id="export-procedural-materials" type="checkbox" checked />
+                  <span><strong>Variations procédurales discrètes</strong><small>Nuances légères sur les murs, les toits et le feuillage, également conservées dans Blender.</small></span>
+                </label>
+                <p>Couleurs de repli des surfaces sans image ; elles deviennent principales en mode « sans texture ».</p>
+              </fieldset>
+            </div>
+          </div>
+          <details class="advanced-export-settings">
+            <summary>Paramètres avancés</summary>
+            <div class="advanced-height-controls">
+              <label class="range-control">
+                <span><strong>Amplification du relief et des bâtiments</strong><output id="building-scale-output">× 1,0</output></span>
+                <input id="export-building-scale" type="range" min="0.5" max="3" step="0.1" value="1" />
+              </label>
+              <label class="range-control">
+                <span><strong>Amplification de la hauteur des arbres</strong><output id="tree-scale-output">× 1,0</output></span>
+                <input id="export-tree-scale" type="range" min="0.8" max="2.5" step="0.1" value="1" />
+              </label>
+            </div>
+            <label class="procedural-material-toggle forest-curve-toggle">
+              <input id="export-canopy-curves" type="checkbox" checked />
+              <span><strong>Lisser les lisières de la forêt</strong><small>Activé par défaut. Désactivez-le uniquement pour conserver des contours en segments.</small></span>
+            </label>
+            <div class="advanced-grid">
+              <label>Socle (mm)<input id="export-base" type="number" min="0.5" max="30" step="0.5" value="3" /></label>
+              <label>Relief route (mm)<input id="export-road-height" type="number" min="0.1" max="5" step="0.1" value="0.6" /></label>
+              <label>Surélévation route Blender (m)<input id="export-road-elevation" type="number" min="0" max="5" step="0.05" value="0" /></label>
+              <label>Arbre minimum (mm)<input id="export-tree-min-height" type="number" min="1" max="30" step="0.5" value="5" /></label>
+              <label>Diamètre tronc (mm)<input id="export-tree-trunk" type="number" min="0.4" max="8" step="0.1" value="1.2" /></label>
+              <label>Diamètre feuillage (mm)<input id="export-tree-crown" type="number" min="1" max="20" step="0.5" value="3" /></label>
+            </div>
+          </details>
+        </section>
+
+        <section class="wizard-step" data-export-step="5" hidden>
+          <div class="wizard-heading">
+            <p class="eyebrow">Étape 5 sur 5</p>
+            <h3>Nommer et vérifier</h3>
+            <p>Vous pouvez conserver ce réglage avant de lancer l’export.</p>
+          </div>
+          <div class="export-review" id="export-review"></div>
+          <div class="final-fields">
+            <label>Nom du fichier<input id="export-output-name" type="text" value="" maxlength="80" placeholder="Calculé depuis la zone" /></label>
+            <label>Nom du profil réutilisable <span>facultatif</span><input id="export-preset-name" type="text" maxlength="60" placeholder="Ex. Maquette urbaine détaillée" /></label>
+          </div>
+          <p class="preset-help">Un profil portant le même nom sera remplacé. La zone géographique n’est jamais enregistrée dans le profil.</p>
+        </section>
+
+        <div class="wizard-footer">
+          <button class="secondary-button" id="export-back" type="button" hidden>Retour</button>
+          <button class="primary-button" id="export-next" type="button">Continuer</button>
+          <button class="primary-button" id="export-submit" type="submit" hidden>Lancer l’export</button>
+        </div>
+        </form>
+      </div>
+
+      <section class="export-history-view" id="export-history-view" hidden>
+        <div class="export-history-heading">
+          <div>
+            <p class="eyebrow">Fichiers générés</p>
+            <h3>Exports récents</h3>
+          </div>
+          <div class="export-history-heading-actions">
+            <button class="secondary-button compact-button" id="refresh-exports" type="button">Actualiser</button>
+          </div>
+        </div>
+        <div class="export-history-list" id="export-history-list"></div>
+      </section>
+    </aside>
+
+    <aside class="side-panel activity-panel" id="activity-panel" aria-hidden="true" aria-labelledby="activity-title">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Suivi des workers</p>
+          <h2 id="activity-title">Activité récente</h2>
+        </div>
+        <button class="icon-button close-panel" type="button" aria-label="Fermer le panneau">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
+        </button>
+      </div>
+      <div class="activity-summary" id="activity-summary"></div>
+      <div class="job-list" id="job-list">
+        <div class="loading-row"><span class="spinner"></span>Chargement de l’activité…</div>
+      </div>
+      <section class="server-log-section" aria-labelledby="server-log-title">
+        <div class="inline-heading">
+          <strong id="server-log-title">Journal du serveur</strong>
+          <small>Actions et erreurs récentes</small>
+        </div>
+        <div class="server-log-list" id="server-log-list">
+          <div class="loading-row"><span class="spinner"></span>Chargement du journal…</div>
+        </div>
+      </section>
+    </aside>
+
+    <dialog class="stl-viewer-dialog" id="stl-viewer-dialog" aria-labelledby="stl-viewer-title">
+      <div class="stl-viewer-shell">
+        <header class="stl-viewer-header">
+          <div class="stl-viewer-heading">
+            <h2 id="stl-viewer-title">Visualiseur STL</h2>
+            <p id="stl-viewer-name">Chargement…</p>
+          </div>
+          <button class="icon-button" id="stl-viewer-close" type="button" aria-label="Fermer le visualiseur">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
+          </button>
+        </header>
+        <section class="stl-viewer-stage" id="stl-viewer-stage" aria-label="Aperçu du fichier STL">
+          <canvas id="stl-viewer-canvas" aria-label="Modèle STL manipulable en 3D"></canvas>
+          <div class="stl-viewer-loading" id="stl-viewer-loading" hidden>
+            <span class="spinner"></span><span>Chargement du modèle…</span>
+          </div>
+          <div class="stl-viewer-error" id="stl-viewer-error" role="alert" hidden></div>
+        </section>
+        <footer class="stl-viewer-footer">
+          <dl class="stl-viewer-stats" id="stl-viewer-stats" hidden>
+            <div><dt>Triangles</dt><dd id="stl-viewer-triangles">—</dd></div>
+            <div><dt>Dimensions*</dt><dd id="stl-viewer-dimensions">—</dd></div>
+            <div><dt>Taille</dt><dd id="stl-viewer-size">—</dd></div>
+          </dl>
+          <div class="stl-viewer-footer-actions">
+            <small>* Unités du fichier STL</small>
+            <button class="secondary-button compact-button" id="stl-viewer-reset" type="button" disabled>Recentrer</button>
+          </div>
+        </footer>
+      </div>
+    </dialog>
+
+    <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+    <noscript>
+      <div class="noscript-message">JavaScript est nécessaire pour afficher et piloter la carte.</div>
+    </noscript>
+  </body>
+</html>
+

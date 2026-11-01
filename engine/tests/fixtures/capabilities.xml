@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Contexte : extrait réduit des paramètres IGN WGS84G_6_14.
+     Usage : vérifier unités, niveaux autorisés, styles et formats sans réseau.
+     Le niveau 15 est ajouté artificiellement pour vérifier qu'il est ignoré
+     lorsqu'il n'est pas autorisé dans les limites de la couche. -->
+<Capabilities xmlns="http://www.opengis.net/wmts/1.0" xmlns:ows="http://www.opengis.net/ows/1.1">
+  <Contents>
+    <Layer>
+      <ows:Identifier>ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES</ows:Identifier>
+      <Style><ows:Identifier>alternative</ows:Identifier></Style>
+      <Style isDefault="true"><ows:Identifier>normal</ows:Identifier></Style>
+      <Format>image/png</Format><Format>image/tiff</Format><Format>image/x-bil;bits=32</Format>
+      <TileMatrixSetLink>
+        <TileMatrixSet>WGS84G_6_14</TileMatrixSet>
+        <TileMatrixSetLimits>
+          <TileMatrixLimits>
+            <TileMatrix>13</TileMatrix>
+            <MinTileRow>1770</MinTileRow><MaxTileRow>5188</MaxTileRow>
+            <MinTileCol>5326</MinTileCol><MaxTileCol>10831</MaxTileCol>
+          </TileMatrixLimits>
+          <TileMatrixLimits>
+            <TileMatrix>14</TileMatrix>
+            <MinTileRow>3540</MinTileRow><MaxTileRow>10376</MaxTileRow>
+            <MinTileCol>10653</MinTileCol><MaxTileCol>21663</MaxTileCol>
+          </TileMatrixLimits>
+        </TileMatrixSetLimits>
+      </TileMatrixSetLink>
+    </Layer>
+    <TileMatrixSet>
+      <ows:Identifier>WGS84G_6_14</ows:Identifier>
+      <ows:SupportedCRS>IGNF:WGS84G</ows:SupportedCRS>
+      <TileMatrix>
+        <ows:Identifier>13</ows:Identifier>
+        <ScaleDenominator>34123.6733415965414480</ScaleDenominator>
+        <TopLeftCorner>-180 90</TopLeftCorner>
+        <TileWidth>256</TileWidth><TileHeight>256</TileHeight>
+        <MatrixWidth>16384</MatrixWidth><MatrixHeight>8192</MatrixHeight>
+      </TileMatrix>
+      <TileMatrix>
+        <ows:Identifier>14</ows:Identifier>
+        <ScaleDenominator>17061.8366707982518644</ScaleDenominator>
+        <TopLeftCorner>-180 90</TopLeftCorner>
+        <TileWidth>256</TileWidth><TileHeight>256</TileHeight>
+        <MatrixWidth>32768</MatrixWidth><MatrixHeight>16384</MatrixHeight>
+      </TileMatrix>
+      <TileMatrix>
+        <ows:Identifier>15</ows:Identifier>
+        <ScaleDenominator>8530.9183353991259322</ScaleDenominator>
+        <TopLeftCorner>-180 90</TopLeftCorner>
+        <TileWidth>256</TileWidth><TileHeight>256</TileHeight>
+        <MatrixWidth>65536</MatrixWidth><MatrixHeight>32768</MatrixHeight>
+      </TileMatrix>
+    </TileMatrixSet>
+  </Contents>
+</Capabilities>
+

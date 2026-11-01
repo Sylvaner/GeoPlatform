@@ -1,0 +1,760 @@
+# Contexte : export hors ligne des données du cache vers une scène Blender autonome.
+# Usage : cargo run --bin geo-export -- --config export.toml
+# Chaque paramètre a sa valeur par défaut dans export.default.toml.
+# Une couche vide n'est jamais créée, même si enabled = true.
+
+# Version du format de configuration ; conserver 1.
+schema_version = 1
+
+[area]
+# Centre de la zone : [latitude, longitude] avec crs = "latlon" ; sinon [x, y].
+center = [48.26183052164179,4.738721628572549]
+
+# Repère du centre : "latlon" ou code EPSG, par exemple "EPSG:2154".
+crs = "latlon"
+
+# Longueur du côté du carré à exporter, en mètres ; doit être couvert par le cache.
+side_m = 3000
+
+[paths]
+# Dossier contenant RGE_ALTI, BD_ORTHO, BD_TOPO, LIDAR_HD, etc.
+# Relatif à ce TOML, ou absolu sur un autre disque / partage réseau.
+# Sous Windows, utiliser des apostrophes : 'D:\Geo\cache' ou '\\nas\partage\cache'.
+cache_root = "."
+
+# Fichier Blender final, relatif au TOML ou absolu ; peut être sur un autre disque.
+# Le dossier est créé si nécessaire. Exemple réseau : '\\nas\partage\scene.blend'.
+output_file = "exports/scene.blend"
+
+# Dossier des préparations temporaires, relatif au TOML ou absolu.
+# Peut rester sur un disque local même si le cache et le résultat sont sur le réseau.
+# Aucun fichier source du cache n'y est déplacé. Exemple : 'C:\Geo\travail'.
+work_directory = "exports/.work"
+
+# Conserver le sous-dossier de travail après réussite, pour examiner le plan intermédiaire.
+keep_work_files = false
+
+# Autoriser le remplacement du .blend et de l'aperçu existants.
+overwrite = false
+
+# Préparer les données sans lancer Blender ; conserve le plan pour diagnostic.
+prepare_only = false
+
+[terrain]
+# "auto" : ALTI, puis LiDAR sol pour les manques ; "alti" ou "lidar" impose une source.
+source = "auto"
+
+# Espacement visé entre sommets du terrain, en mètres. Ne réduit pas les images.
+grid_step_m = 10
+
+# Limite du nombre de sommets du terrain ; une scène trop dense produit une erreur explicite.
+max_vertices = 250000
+
+# Multiplicateur vertical : 1 respecte les hauteurs réelles, 2 accentue le relief.
+vertical_exaggeration = 1
+
+# "min" recentre les altitudes près de zéro ; "absolute" conserve leur valeur Lambert-93.
+altitude_origin = "min"
+
+# Altitude minimale admissible en mètres ; élimine les valeurs sans données.
+valid_altitude_min_m = -500
+
+# Altitude maximale admissible en mètres ; élimine les valeurs aberrantes.
+valid_altitude_max_m = 9000
+
+# Classe LAS des points sol ; 2 correspond au sol dans le LiDAR IGN.
+lidar_ground_class = 2
+
+# Rayon maximal, en cellules de terrain, pour combler un manque à partir de voisins mesurés.
+lidar_fill_radius_cells = 3
+
+[ortho]
+# Limite de sécurité du nombre de JPEG natifs intégrés ; erreur plutôt que réduction silencieuse.
+max_tiles = 20000
+
+# Nombre de tuiles décodées simultanément pour lire les altitudes ; ne change pas leur définition.
+max_loaded_tiles = 64
+
+# Filtrage d'affichage : "nearest" conserve les pixels nets, "bilinear" adoucit. Les JPEG restent inchangés.
+interpolation = "nearest"
+
+[layers]
+[layers.terrain]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.36,0.31,0.2,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 3
+
+[layers.orthophoto]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [1,1,1,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.03
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 3
+
+[layers.vegetation]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.16,0.32,0.1,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.2
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 3
+
+[layers.lidar_points]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.37,0.52,0.28,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.2
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 3
+
+[layers."bd_topo.batiment"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.7,0.66,0.55,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.2
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 7
+
+[layers."bd_topo.troncon_de_route"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.25,0.26,0.24,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 6
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.2
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 0
+
+[layers."bd_topo.troncon_de_voie_ferree"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.32,0.27,0.21,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 2
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.2
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 0
+
+[layers."bd_topo.construction_lineaire"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.48,0.44,0.36,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.2
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 0
+
+[layers."bd_topo.construction_ponctuelle"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.52,0.48,0.4,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.2
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 3
+
+[layers."bd_topo.construction_surfacique"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.59,0.55,0.43,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.2
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 2
+
+[layers."bd_topo.equipement_de_transport"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.43,0.45,0.42,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.2
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 2
+
+[layers."bd_topo.ligne_electrique"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.2,0.22,0.24,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 0.15
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.2
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 12
+
+[layers."bd_topo.pylone"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.39,0.42,0.43,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.2
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 18
+
+[layers."bd_topo.poste_de_transformation"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.52,0.52,0.45,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.2
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 4
+
+[layers."bd_topo.canalisation"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.48,0.45,0.4,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 0.6
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.2
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 0
+
+[layers."bd_topo.reservoir"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.57,0.61,0.61,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.2
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 6
+
+[layers."cadastre.parcelle"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Le cadastre reste disponible mais masqué à l'ouverture et au rendu par défaut.
+visible = false
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.85,0.65,0.25,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 0.3
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.4
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 3
+
+[layers."bd_topage.CoursEau"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.08,0.32,0.46,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1.5
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.3
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 3
+
+[layers."bd_topage.TronconHydrographique"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.08,0.32,0.46,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1.5
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.3
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 3
+
+[layers."bd_topage.PlanEau"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.08,0.32,0.46,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1.5
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.3
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 3
+
+[layers."bd_topage.SurfaceElementaire"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.08,0.32,0.46,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1.5
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.3
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 3
+
+[layers."bd_topage.NoeudHydrographique"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.08,0.32,0.46,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1.5
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.3
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 3
+
+[layers."bd_topage.BassinVersantTopographique"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.08,0.32,0.46,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1.5
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.3
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 3
+
+[layers."bd_topage.BassinHydrographique"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.08,0.32,0.46,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1.5
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.3
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 3
+
+[layers."bd_topage.LimiteTerreEau"]
+# Inclure cette couche si elle contient des éléments ; false l'exclut complètement du fichier.
+enabled = true
+
+# Afficher cette couche à l'ouverture et au rendu ; false la conserve mais la masque.
+visible = true
+
+# Couleur simple [rouge, vert, bleu, opacité], chaque valeur entre 0 et 1.
+color = [0.08,0.32,0.46,1]
+
+# Largeur en mètres des lignes ; pour les routes, largeur de la chaussée fusionnée.
+line_width_m = 1.5
+
+# Décalage vertical en mètres pour limiter la superposition de surfaces au même niveau.
+z_offset_m = 0.3
+
+# Hauteur de secours en mètres si la source ne donne pas de hauteur exploitable.
+fallback_height_m = 3
+
+[vectors]
+# Utiliser aussi les pages valides de caches interrompus ou couvrant seulement une partie de la zone.
+allow_partial_cache = true
+# "skip" ignore un cache vectoriel absent avec un message ; "error" arrête l'export.
+missing_layers = "skip"
+
+# Nombre maximal d'objets source dans une couche ; dépassement signalé comme erreur.
+max_objects_per_layer = 100000
+
+# Distance maximale entre échantillons d'une ligne ou d'une chaussée sur le terrain, en mètres.
+line_sample_step_m = 10
+
+# Limite de sommets de la chaussée fusionnée ; augmenter seulement si la mémoire le permet.
+max_road_vertices = 2000000
+
+# Champs BD TOPO essayés dans cet ordre pour la hauteur ; sinon hauteur de secours de la couche.
+building_height_fields = ["hauteur","hauteur_mediane","height"]
+
+# Millésime du cache BD TOPAGE à lire, sous BD_TOPAGE/<millésime>.
+topage_edition = "2026"
+
+[vegetation]
+# Classes LAS utilisées comme végétation ; 3, 4 et 5 représentent les végétations basse, moyenne et haute.
+classes = [3,4,5]
+
+# Taille des cellules de canopée en mètres ; un volume simple par cellule, pas un inventaire d'arbres.
+cell_size_m = 12
+
+# Hauteur minimale en mètres d'un volume de végétation au-dessus du terrain.
+min_height_m = 3
+
+# Hauteur maximale en mètres ; filtre les points de végétation aberrants.
+max_height_m = 45
+
+# Nombre maximal de volumes de végétation ; répartis sur toute la zone.
+max_trees = 2500
+
+# Rayon du houppier rapporté à la hauteur de l'arbre.
+crown_radius_ratio = 0.24
+
+# Rayon du tronc rapporté à la hauteur de l'arbre.
+trunk_radius_ratio = 0.022
+
+# Détail de la sphère de feuillage : 1 est léger ; maximum 3.
+canopy_subdivisions = 1
+
+# Graine fixe pour rendre les variations et l'échantillonnage reproductibles.
+seed = 42
+
+# Couleur de base du feuillage [rouge, vert, bleu, opacité], entre 0 et 1.
+foliage_color = [0.12,0.28,0.065,1]
+
+# Couleur de base de l'écorce [rouge, vert, bleu, opacité], entre 0 et 1.
+bark_color = [0.2,0.12,0.06,1]
+
+# Amplitude des variations de couleur du feuillage et de l'écorce, sans image externe.
+procedural_variation = 0.22
+
+[lidar]
+# Nombre maximal de points de l'aperçu LiDAR ; indépendant des mesures utilisées pour le terrain et les toits.
+max_display_points = 10000
+
+# Taille en mètres des petits repères représentant les points LiDAR.
+display_point_size_m = 0.2
+
+# Prendre un candidat d'aperçu tous les N points, puis limiter par échantillonnage réparti.
+display_stride = 200
+
+[camera]
+# Caméra "orthographic" pour une vue sans perspective, ou "perspective".
+projection = "orthographic"
+
+# Direction de la caméra en degrés autour du terrain.
+azimuth_deg = 225
+
+# Hauteur angulaire de la caméra en degrés : entre 0 exclu et 90 inclus.
+elevation_deg = 55
+
+# Marge de cadrage autour du terrain ; 1.18 laisse 18 % de marge.
+framing_margin = 1.18
+
+# Focale en millimètres en mode perspective ; ignorée en mode orthographique.
+focal_length_mm = 45
+
+# Distance maximale visible par la caméra, en mètres.
+clip_end_m = 10000
+
+[water]
+# Garde minimale au-dessus du terrain et de l'orthophoto, en mètres de scène.
+# La découpe suit le relief : cette garde ne compense pas de grands triangles traversants.
+surface_clearance_m = 0.15
+
+# Épaisseur graphique ajoutée vers le bas, sans déplacer la surface ni inventer une profondeur réelle.
+thickness_m = 1.0
+
+# Limite de sommets par objet d'eau, pour éviter une découpe démesurée.
+max_vertices = 2000000
+
+[view]
+# Distance d'affichage de la vue 3D, en mètres ; indépendante du clip end de la caméra.
+clip_end_m = 10000
+
+# Replier les collections en mode View Layer ; finalisation dans une fenêtre masquée sous Windows.
+collapse_outliner = true
+
+# Délai maximal de cette finalisation, en secondes ; nécessite une session graphique.
+# Sur un serveur sans affichage, mettre collapse_outliner = false pour exporter sans cette étape.
+outliner_timeout_seconds = 180
+
+# Conserver le terrain mais le masquer si la couche orthophoto est activée et présente.
+hide_terrain_with_orthophoto = true
+
+[lighting]
+# Direction horizontale du soleil en degrés.
+sun_azimuth_deg = 135
+
+# Hauteur du soleil au-dessus de l'horizon en degrés.
+sun_elevation_deg = 45
+
+# Intensité de la lumière solaire Blender.
+sun_energy = 3
+
+# Taille angulaire du soleil en degrés ; augmente la douceur des ombres.
+sun_angle_deg = 4
+
+# Intensité de la lumière ambiante du ciel.
+sky_strength = 0.35
+
+# Couleur du ciel [rouge, vert, bleu, opacité], entre 0 et 1.
+sky_color = [0.62,0.77,1,1]
+
+[render]
+# Moteur "BLENDER_EEVEE" léger, ou "CYCLES" pour un rendu plus coûteux.
+engine = "BLENDER_EEVEE"
+
+# Largeur en pixels du rendu ; ne modifie pas les JPEG intégrés.
+resolution_x = 1600
+
+# Hauteur en pixels du rendu ; ne modifie pas les JPEG intégrés.
+resolution_y = 1200
+
+# Nombre d'échantillons de rendu ; augmenter pour réduire le bruit.
+samples = 32
+
+# Créer aussi une image PNG après l'enregistrement du .blend.
+preview = false
+
+# Chemin du PNG d'aperçu ; utilisé seulement si preview = true.
+preview_file = "exports/scene.png"
+
+# Fond transparent dans l'image rendue.
+transparent_background = false
+
+[blender]
+# "auto" recherche Blender installé ; sinon indiquer le chemin complet de blender.exe.
+executable = "auto"
+
+# Compresser le conteneur .blend sans redimensionner ni recompresser les JPEG sources.
+compress_file = true
+
+# Nombre de threads du processus Blender.
+threads = 4
+
+[buildings]
+# "auto" retient un toit LiDAR assez documenté, sinon BD TOPO ; "bd_topo" l'impose ; "lidar" exige les seuils LiDAR.
+source = "auto"
+
+# Plaquer les JPEG BD ORTHO sur les toits. Les façades n'ont pas de photo exploitable dans une orthophoto.
+texture_roofs = true
+
+# Garder les Z de toit BD TOPO s'ils existent et sont cohérents, plutôt qu'une extrusion plate.
+use_bd_topo_altitudes = true
+
+# Taille en mètres des cellules de toit LiDAR ; 1 garde des détails plus fins que le terrain.
+cell_size_m = 1
+
+# Nombre minimal de points LAS de classe 6 pour accepter un toit LiDAR.
+min_points = 12
+
+# Part minimale des cellules du contour couvertes par des mesures valides, entre 0 et 1.
+min_coverage = 0.7
+
+# Densité minimale de points bâtiment par mètre carré pour préférer le toit LiDAR.
+min_density_per_m2 = 2
+
+# Hauteur minimale du toit au-dessus du terrain, en mètres ; rejette des points sol mal classés.
+min_height_m = 2
+
+# Hauteur maximale du toit au-dessus du terrain, en mètres ; rejette les valeurs aberrantes.
+max_height_m = 150
+
+# Écart maximal entre altitudes d'une cellule LiDAR, en mètres ; rejette les cellules incohérentes.
+max_cell_spread_m = 5
+
+# Distance maximale, en cellules de toit, pour interpoler entre mesures voisines ; pas de grand trou inventé.
+fill_radius_cells = 3
+
+# Limite des cellules LiDAR de bâtiment conservées pour toute la scène ; dépassement = erreur.
+max_cells = 2000000
+
+# Limite des cellules testées pour un bâtiment ; dépassement = erreur.
+max_cells_per_building = 100000
+
+

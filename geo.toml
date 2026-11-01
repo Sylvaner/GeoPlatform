@@ -1,0 +1,32 @@
+# Configuration courte du serveur. Les réglages de chaque export restent dans
+# la requête qui l'a créé afin que chaque fichier soit reproductible.
+
+[server]
+bind = "127.0.0.1:8080"
+
+[storage]
+root = "storage"
+
+[workers]
+downloads = 2
+exports = 1
+
+# Presets STL calculés après les téléchargements contenant du LiDAR.
+# Une liste vide désactive le préchauffage STL.
+[cache_warmup]
+stl_grid_steps_m = [50.0, 80.0, 100.0]
+# Atlas Blender préchauffés uniquement pour les téléchargements contenant l'orthophoto.
+# Le buffer de 8192 px peut demander environ 1 Gio ; retirez-le si la mémoire est limitée.
+blender_atlas_resolutions_px = [512, 2048, 4096, 8192]
+
+# Palette par défaut de l'interface et des exports Blender, au format RGBA.
+[render.colors]
+ground = [0.470588, 0.607843, 0.447059, 1.0]
+walls = [0.831373, 0.803922, 0.733333, 1.0]
+roofs = [0.721569, 0.580392, 0.384314, 1.0]
+trees = [0.247059, 0.470588, 0.337255, 1.0]
+roads = [0.105882, 0.121569, 0.113725, 1.0]
+water = [0.184314, 0.560784, 0.741176, 1.0]
+forest_low = [0.023529, 0.121569, 0.019608, 1.0]
+forest_high = [0.082353, 0.419608, 0.058824, 1.0]
+

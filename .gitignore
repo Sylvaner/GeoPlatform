@@ -1,0 +1,5 @@
+/target/
+/storage/
+/geo.local.toml
+/.geo-server.pid
+
